@@ -145,8 +145,10 @@ const HabrParser = (() => {
   }
 
   function getRatingDetails(doc) {
-    const scoreEl = doc.querySelector('.tm-votes-lever__score-counter');
-    const rating = scoreEl ? parseInt(scoreEl.textContent.trim(), 10) : null;
+    const scoreEl = doc.querySelector(
+      '.tm-votes-meter__value_rating, .tm-votes-meter__value[title*="голос"], .tm-votes-lever__score-counter',
+    );
+    const rating = scoreEl ? parseRatingValue(scoreEl.textContent) : null;
 
     const voteItems = doc.querySelectorAll('.tm-votes-lever__vote');
     let up = null;

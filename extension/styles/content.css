@@ -1,0 +1,111 @@
+.habr-md-host {
+  position: relative !important;
+}
+
+.habr-md-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 72px;
+  height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #7eb3c7, #4d8398);
+  color: #fff;
+  font: 700 13px/1 "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 10px rgba(77, 131, 152, 0.35);
+  cursor: pointer;
+}
+
+.habr-md-btn:hover:not(:disabled):not(.habr-md-btn--loading) {
+  background: linear-gradient(135deg, #8fc0d3, #5591a8);
+}
+
+.habr-md-btn:disabled {
+  cursor: wait;
+}
+
+.habr-md-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+.habr-md-btn--article {
+  top: 4px;
+  right: 0;
+  min-width: 80px;
+  height: 38px;
+  font-size: 14px;
+}
+
+.habr-md-btn--feed {
+  top: 10px;
+  right: 10px;
+}
+
+.habr-md-btn--loading {
+  opacity: 0.88;
+}
+
+.habr-md-btn--success {
+  background: linear-gradient(135deg, #3dab6a, #2e8b54);
+  box-shadow: 0 2px 10px rgba(46, 139, 84, 0.4);
+}
+
+.habr-md-btn--skip {
+  background: linear-gradient(135deg, #d4a017, #b8860b);
+  box-shadow: 0 2px 10px rgba(184, 134, 11, 0.35);
+}
+
+.habr-md-btn--error {
+  background: linear-gradient(135deg, #d9534f, #c0392b);
+  box-shadow: 0 2px 10px rgba(192, 57, 43, 0.35);
+}
+
+.habr-md-toast {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 21;
+  max-width: 260px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #1a2630;
+  color: #fff;
+  font: 600 12px/1.35 "Segoe UI", system-ui, sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+.habr-md-toast[hidden] {
+  display: none;
+}
+
+.habr-md-toast--success {
+  background: #1e6b42;
+}
+
+.habr-md-toast--skip {
+  background: #8a6914;
+}
+
+.habr-md-toast--error {
+  background: #922b21;
+}
+
+.habr-md-toast--info {
+  background: #3a6575;
+}
+
+#habr-md-fab {
+  display: none !important;
+}

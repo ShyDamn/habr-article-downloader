@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="styles/popup.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header__brand">
+      <img src="icons/icon48.png" width="36" height="36" alt="">
+      <div>
+        <h1>Habr → Markdown</h1>
+        <p>Кнопка <strong>.md</strong> — в шапке статьи или на карточке в ленте</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="batch" role="tab">Пакет</button>
+      <button class="tab" data-tab="watch" role="tab">Слежение</button>
+      <button class="tab" data-tab="settings" role="tab">Настройки</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Пакет -->
+    <section id="panel-batch" class="panel active">
+      <div class="block">
+        <label class="label" for="batchLinks">Ссылки на статьи</label>
+        <textarea id="batchLinks" rows="5" placeholder="https://habr.com/ru/articles/123456/&#10;по одной на строку"></textarea>
+        <label class="file-drop">
+          <input type="file" id="batchFile" accept=".txt,text/plain" hidden>
+          <span>Загрузить .txt</span>
+        </label>
+        <button id="batchBtn" class="btn btn--primary">Скачать пакетом</button>
+        <div id="batchProgress" class="notice" hidden></div>
+      </div>
+    </section>
+
+    <!-- Слежение -->
+    <section id="panel-watch" class="panel">
+      <div class="block">
+        <label class="switch-row">
+          <span>Слежение включено</span>
+          <input type="checkbox" id="watchEnabled" class="switch">
+        </label>
+
+        <label class="label" for="watchSources">Источники</label>
+        <textarea id="watchSources" rows="3" placeholder="https://habr.com/ru/feed/"></textarea>
+        <p class="help">Для «Моей ленты» нужен вход на habr.com в этом браузере.</p>
+
+        <div class="row-3">
+          <label class="label" for="watchInterval">Интервал, мин</label>
+          <label class="label" for="watchMaxPages">Страниц</label>
+          <label class="label" for="watchMaxDownloads">За цикл</label>
+          <input type="number" id="watchInterval" min="5" max="1440" value="15">
+          <input type="number" id="watchMaxPages" min="1" max="3" value="1">
+          <input type="number" id="watchMaxDownloads" min="1" max="20" value="5">
+        </div>
+      </div>
+
+      <details class="block block--fold" open>
+        <summary>Фильтры</summary>
+        <div class="block__body">
+          <span class="label">Тип</span>
+          <div class="chips" id="filterTypesChips">
+            <label class="chip"><input type="checkbox" name="filterTypes" value="articles" checked hidden><span>Статьи</span></label>
+            <label class="chip"><input type="checkbox" name="filterTypes" value="posts" hidden><span>Посты</span></label>
+            <label class="chip"><input type="checkbox" name="filterTypes" value="news" hidden><span>Новости</span></label>
+          </div>
+
+          <label class="label" for="filterScore">Мин. рейтинг</label>
+          <select id="filterScore">
+            <option value="all">Любой</option>
+            <option value="0">≥ 0</option>
+            <option value="10">≥ 10</option>
+            <option value="25">≥ 25</option>
+            <option value="50">≥ 50</option>
+            <option value="100" selected>≥ 100</option>
+          </select>
+
+          <label class="label" for="filterComplexity">Сложность</label>
+          <select id="filterComplexity">
+            <option value="all" selected>Любая</option>
+            <option value="easy">Простой</option>
+            <option value="medium">Средний</option>
+            <option value="hard">Сложный</option>
+          </select>
+
+          <label class="label" for="filterHubsExclude">Исключить хабы</label>
+          <input type="text" id="filterHubsExclude" placeholder="блог компании">
+
+          <label class="label" for="filterTagsExclude">Исключить теги</label>
+          <input type="text" id="filterTagsExclude" placeholder="timeweb_статьи">
+        </div>
+      </details>
+
+      <div class="footer-actions">
+        <button id="saveWatchBtn" class="btn btn--ghost">Сохранить</button>
+        <button id="watchNowBtn" class="btn btn--primary">Проверить сейчас</button>
+      </div>
+      <div id="watchProgress" class="notice" hidden></div>
+    </section>
+
+    <!-- Настройки -->
+    <section id="panel-settings" class="panel">
+      <details class="block block--fold" open>
+        <summary>Файлы</summary>
+        <div class="block__body">
+          <label class="label" for="downloadFolder">Папка для .md</label>
+          <input type="text" id="downloadFolder" placeholder="downloads">
+          <label class="label" for="filenameTemplate">Шаблон имени</label>
+          <input type="text" id="filenameTemplate" placeholder="{id}_{title}">
+          <p class="help">{id} {title} {date} {author} {type}</p>
+          <label class="switch-row">
+            <span>Подпапка по типу</span>
+            <input type="checkbox" id="subfolderByType" class="switch">
+          </label>
+          <label class="switch-row">
+            <span>Подпапка по хабу</span>
+            <input type="checkbox" id="subfolderByHub" class="switch">
+          </label>
+        </div>
+      </details>
+
+      <details class="block block--fold">
+        <summary>Контент и интерфейс</summary>
+        <div class="block__body">
+          <label class="switch-row">
+            <span>Комментарии в .md</span>
+            <input type="checkbox" id="downloadComments" class="switch" checked>
+          </label>
+          <label class="switch-row">
+            <span>Картинки локально</span>
+            <input type="checkbox" id="downloadImages" class="switch">
+          </label>
+          <label class="switch-row">
+            <span>Кнопка .md на Habr</span>
+            <input type="checkbox" id="showFloatingButton" class="switch" checked>
+          </label>
+          <label class="switch-row">
+            <span>Контекстное меню</span>
+            <input type="checkbox" id="enableContextMenu" class="switch" checked>
+          </label>
+          <label class="switch-row">
+            <span>Уведомления</span>
+            <input type="checkbox" id="enableNotifications" class="switch">
+          </label>
+        </div>
+      </details>
+
+      <details class="block block--fold">
+        <summary>Запросы к Habr</summary>
+        <div class="block__body">
+          <label class="label" for="batchDelay">Пауза между запросами, мс</label>
+          <input type="number" id="batchDelay" min="1500" step="500" value="3000">
+          <label class="switch-row">
+            <span>RSS вместо HTML-ленты</span>
+            <input type="checkbox" id="useRssDiscovery" class="switch">
+          </label>
+          <p class="help">RSS не показывает рейтинг — больше лишних запросов. Лучше держать выключенным.</p>
+          <label class="label" for="redownloadAfterDays">Перекачать через N дней (0 = нет)</label>
+          <input type="number" id="redownloadAfterDays" min="0" value="0">
+        </div>
+      </details>
+
+      <details class="block block--fold">
+        <summary>Резервная копия</summary>
+        <div class="block__body block__body--backup">
+          <p class="help">Настройки в JSON — для переноса или бэкапа.</p>
+          <div class="btn-row">
+            <button id="exportSettingsBtn" class="btn btn--ghost" type="button">Экспорт</button>
+            <button id="importSettingsBtn" class="btn btn--ghost" type="button">Импорт</button>
+          </div>
+          <input type="file" id="importSettingsFile" accept="application/json,.json" hidden>
+          <div class="backup-danger">
+            <button id="clearIdsBtn" class="btn btn--danger" type="button">Сбросить историю скачанных</button>
+            <p class="help">Слежение снова попробует скачать уже сохранённые статьи.</p>
+          </div>
+        </div>
+      </details>
+
+      <button id="saveSettingsBtn" class="btn btn--primary btn--full btn--save">Сохранить настройки</button>
+      <div id="settingsStatus" class="notice" hidden></div>
+    </section>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

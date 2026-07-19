@@ -1,0 +1,13 @@
+# Локальный архив статей (не часть расширения)
+downloads/
+downloads.zip
+
+# Локальные HTML-фикстуры в корне
+/*.html
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
+.vscode/

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="20" y1="12" x2="108" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7eb3c7"/>
+      <stop offset="1" stop-color="#4d8398"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="26" fill="url(#bg)"/>
+  <text x="64" y="78" font-family="Segoe UI, Arial, sans-serif" font-size="42" font-weight="700" fill="#ffffff" text-anchor="middle">.md</text>
+</svg>

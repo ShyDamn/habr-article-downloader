@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Habr Article Downloader</title>
+<style>
+  body{max-width:760px;margin:0 auto;padding:40px 20px;font:16px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1a2630;}
+  h1{font-size:28px;letter-spacing:-.01em}h2{font-size:20px;margin-top:32px}
+  .muted{color:#64748b}hr{border:none;border-top:1px solid #e2e8f0;margin:32px 0}
+</style>
+</head>
+<body>
+<h1>Privacy Policy — Habr Article Downloader</h1>
+<p class="muted">Last updated: July 21, 2026</p>
+
+<h2>Summary</h2>
+<p><strong>Habr Article Downloader does not collect, transmit, sell, or share any user data.</strong> All processing happens locally in your browser.</p>
+
+<h2>What the extension does</h2>
+<p>The extension converts publications from habr.com into Markdown (.md) files and saves them to your device via the browser's standard download mechanism. It can do this on demand, in batches, or on a schedule based on filters you configure.</p>
+
+<h2>Data storage</h2>
+<ul>
+<li><strong>Settings</strong> (filters, filename template, watch sources, UI options) are stored locally in your browser using <code>chrome.storage.local</code>.</li>
+<li><strong>Download journal</strong> — a local list of IDs of already-downloaded publications, used only to avoid duplicate downloads. Stored locally.</li>
+</ul>
+<p>None of this data ever leaves your device. There are no analytics, no trackers, no external servers, and no accounts.</p>
+
+<h2>Network requests</h2>
+<p>The extension makes requests only to <strong>habr.com</strong> — to fetch the pages and RSS feeds of publications you choose to download. No requests are made to any other host.</p>
+
+<h2>Permissions</h2>
+<ul>
+<li><code>downloads</code> — saving .md files to your device;</li>
+<li><code>storage</code> — local settings and the duplicate-prevention journal;</li>
+<li><code>alarms</code> — the optional scheduled watch feature;</li>
+<li><code>contextMenus</code> — optional right-click menu items on habr.com;</li>
+<li><code>notifications</code> — optional completion notifications;</li>
+<li>host access to <code>https://habr.com/*</code> — the extension's single purpose is working with Habr.</li>
+</ul>
+
+<h2>Third parties</h2>
+<p>No data is sold or shared with third parties. No data is used for creditworthiness, lending, advertising, or any purpose unrelated to the extension's single purpose.</p>
+
+<h2>Changes</h2>
+<p>Any changes to this policy will be published on this page.</p>
+
+<h2>Contact</h2>
+<p>Questions: open an issue at <a href="https://github.com/ShyDamn/habr-article-downloader">github.com/ShyDamn/habr-article-downloader</a>.</p>
+<hr>
+<p class="muted">Habr Article Downloader is an independent open-source project and is not affiliated with Habr.</p>
+</body>
+</html>

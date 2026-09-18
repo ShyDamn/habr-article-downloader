@@ -336,3 +336,22 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.4; }
 .notice[hidden] { display: none; }
 .notice--ok { background: #ecfdf3; color: var(--ok); }
 .notice--err { background: #fef2f2; color: var(--err); }
+
+.journal { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+.journal__row {
+  border-left: 3px solid var(--border, #ddd);
+  padding: 6px 8px;
+  background: var(--surface-2, rgba(0,0,0,.03));
+  border-radius: 4px;
+  font-size: 12px;
+}
+.journal__row--ok { border-left-color: #3f9d5a; }
+.journal__row--skip { border-left-color: #9aa0a6; }
+.journal__row--warn { border-left-color: #d99a2b; }
+.journal__row--err { border-left-color: #cc4b4b; }
+.journal__head { font-variant-numeric: tabular-nums; opacity: .65; }
+.journal__body { margin-top: 2px; word-break: break-word; }
+.journal__link { display: block; margin-top: 2px; font-size: 11px; opacity: .6; text-decoration: none; color: inherit; }
+.journal__link:hover { text-decoration: underline; }
+
+.notice--warn { background: rgba(217,154,43,.12); border-left: 3px solid #d99a2b; display: flex; gap: 8px; align-items: center; justify-content: space-between; }

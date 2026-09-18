@@ -20,6 +20,8 @@ const HabrCore = (() => {
     batchDelayMs: 3000,
     downloadImages: false,
     downloadComments: true,
+    commentsLimit: 500,
+    useApiParser: true,
     filenameTemplate: '{id}_{title}',
     subfolderByType: false,
     subfolderByHub: false,
@@ -41,8 +43,24 @@ const HabrCore = (() => {
     return { ...DEFAULT_SETTINGS, ...stored, ...HabrFilters.normalizeSettings(stored) };
   }
 
+  const MAX_WATCH_PAGES = 5;
+  const ITEMS_PER_PAGE_ESTIMATE = 20;
+
+  function normalizeMaxPages(settings) {
+    const raw = parseInt(settings?.watchMaxPages, 10);
+    if (!Number.isFinite(raw)) return 1;
+    return Math.min(MAX_WATCH_PAGES, Math.max(1, raw));
+  }
+
+  function discoveryBudget(settings) {
+    const base = settings.watchMaxItemsScan || 25;
+    return Math.max(base, normalizeMaxPages(settings) * ITEMS_PER_PAGE_ESTIMATE);
+  }
+
   async function saveSettings(partial) {
-    await chrome.storage.local.set(partial);
+    const payload = { ...partial };
+    if ('watchMaxPages' in payload) payload.watchMaxPages = normalizeMaxPages(payload);
+    await chrome.storage.local.set(payload);
     if ('watchEnabled' in partial || 'watchIntervalMinutes' in partial) {
       await syncWatchAlarm(await getSettings());
     }
@@ -82,9 +100,24 @@ const HabrCore = (() => {
     return `data:text/markdown;charset=utf-8;base64,${base64}`;
   }
 
+  // Chrome MV3 (service worker) не умеет URL.createObjectURL → data:
+  // Firefox MV3 (event page) умеет blob:, а data: в downloads.download запрещает
+  function buildMarkdownDownloadUrl(markdown) {
+    const canBlob = typeof Blob !== 'undefined'
+      && typeof URL !== 'undefined'
+      && typeof URL.createObjectURL === 'function';
+    if (canBlob) {
+      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      setTimeout(() => URL.revokeObjectURL(url), 120000);
+      return url;
+    }
+    return markdownToDataUrl(markdown);
+  }
+
   async function downloadMarkdownToPath(markdown, relativePath) {
     return chrome.downloads.download({
-      url: markdownToDataUrl(markdown),
+      url: buildMarkdownDownloadUrl(markdown),
       filename: relativePath.replace(/\\/g, '/'),
       conflictAction: 'uniquify',
       saveAs: false,
@@ -95,7 +128,10 @@ const HabrCore = (() => {
     return chrome.downloads.download({
       url,
       filename: relativePath.replace(/\\/g, '/'),
-      conflictAction: 'uniquify',
+      // Папка images/<тип>_<id> принадлежит одной публикации, поэтому повторная
+      // загрузка должна заменять файл. При uniquify получались имена вида
+      // «01 (1).png» — и повторное скачивание плодило копии.
+      conflictAction: 'overwrite',
       saveAs: false,
     });
   }
@@ -163,14 +199,15 @@ const HabrCore = (() => {
 
   async function discoverFromSource(sourceUrl, settings) {
     const items = new Map();
-    const maxPages = Math.min(settings.watchMaxPages || 1, 3);
-    const scanLimit = settings.watchMaxItemsScan || 25;
+    const maxPages = normalizeMaxPages(settings);
+    const scanLimit = discoveryBudget(settings);
 
     if (settings.useRssDiscovery) {
       const rssItems = await HabrRss.discoverItems(sourceUrl, HabrFetch.fetchHtml, scanLimit);
       if (rssItems?.length) {
         rssItems.forEach((item) => items.set(item.url, item));
-        return [...items.values()];
+        // RSS отдаёт только первую страницу ленты — при глубине > 1 дочитываем пагинацией
+        if (maxPages === 1 || items.size >= scanLimit) return [...items.values()];
       }
     }
 
@@ -199,31 +236,139 @@ const HabrCore = (() => {
     return [...items.values()];
   }
 
+  const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg', 'bmp', 'ico'];
+
+  // Habr отдаёт часть картинок как //habrastorage.org/... — без схемы.
+  // Такие ссылки надо и находить, и приводить к https, иначе они остаются внешними.
+  const IMAGE_MD_RE = /!\[[^\]]*]\((\/\/[^)\s]+|https?:\/\/[^)\s]+)\)/g;
+
+  function absolutizeImageUrl(url) {
+    return url.startsWith('//') ? `https:${url}` : url;
+  }
+
+  // Пробелы и скобки в пути рвут разметку ![alt](path) — кодируем их.
+  function toMarkdownPath(path) {
+    return path
+      .replace(/%/g, '%25')
+      .replace(/ /g, '%20')
+      .replace(/\(/g, '%28')
+      .replace(/\)/g, '%29');
+  }
+
+  function guessImageExtension(url) {
+    try {
+      const path = new URL(url).pathname;
+      const ext = path.split('.').pop()?.toLowerCase();
+      if (ext && IMAGE_EXTENSIONS.includes(ext)) return ext;
+    } catch {
+      // ниже вернём запасной вариант
+    }
+    // У части ссылок Habr расширения в пути нет вообще. Раньше сюда попадал
+    // кусок домена и получалось «01.com» — файл, который не откроется как картинка.
+    return 'png';
+  }
+
+  // downloads.download резолвится сразу после старта загрузки, а не после её конца.
+  // Ждём завершения и забираем реальное имя файла: при conflictAction "uniquify"
+  // браузер может сохранить «01 (1).png», и ссылка на «01.png» окажется битой.
+  function waitForDownload(downloadId, timeoutMs = 60000) {
+    return new Promise((resolve) => {
+      let done = false;
+
+      const finish = (result) => {
+        if (done) return;
+        done = true;
+        try {
+          chrome.downloads.onChanged.removeListener(onChanged);
+        } catch {
+          // слушателя могло не быть
+        }
+        clearTimeout(timer);
+        resolve(result);
+      };
+
+      const readFilename = async () => {
+        try {
+          const [item] = await chrome.downloads.search({ id: downloadId });
+          const full = item?.filename || '';
+          const base = full.split(/[\\/]/).pop();
+          finish(base ? { ok: true, filename: base } : { ok: false });
+        } catch {
+          finish({ ok: false });
+        }
+      };
+
+      function onChanged(delta) {
+        if (delta.id !== downloadId) return;
+        if (delta.state?.current === 'complete') readFilename();
+        else if (delta.state?.current === 'interrupted') finish({ ok: false });
+      }
+
+      const timer = setTimeout(() => finish({ ok: false }), timeoutMs);
+
+      try {
+        chrome.downloads.onChanged.addListener(onChanged);
+      } catch {
+        finish({ ok: false });
+        return;
+      }
+
+      // Загрузка могла завершиться до подписки — проверяем текущее состояние
+      chrome.downloads.search({ id: downloadId }).then(([item]) => {
+        if (item?.state === 'complete') readFilename();
+        else if (item?.state === 'interrupted') finish({ ok: false });
+      }).catch(() => {});
+    });
+  }
+
   async function downloadImagesForMarkdown(markdown, meta, settings) {
     if (!settings.downloadImages) return markdown;
 
-    const imageRe = /!\[[^\]]*]\((https?:\/\/[^)]+)\)/g;
     const folderBase = HabrFilename.buildRelativeFolder(meta, settings);
-    const imageFolder = `${folderBase}/images/${meta.publicationType}_${meta.articleId}`;
+    const imageDir = `images/${meta.publicationType}_${meta.articleId}`;
+    const imageFolder = `${folderBase}/${imageDir}`;
     const urlMap = {};
+    const seen = new Set();
     let index = 0;
+    let saved = 0;
+    let failed = 0;
 
-    const matches = [...markdown.matchAll(imageRe)];
+    const matches = [...markdown.matchAll(IMAGE_MD_RE)];
     for (const match of matches) {
-      const absolute = match[1];
-      if (urlMap[absolute]) continue;
+      const absolute = absolutizeImageUrl(match[1]);
+      if (seen.has(absolute)) continue;
+      seen.add(absolute);
+
       index += 1;
-      const ext = absolute.split('.').pop()?.split('?')[0]?.slice(0, 4) || 'img';
-      const filename = `${String(index).padStart(2, '0')}.${ext}`.replace(/[^a-z0-9.]/gi, '');
-      const relative = `images/${meta.publicationType}_${meta.articleId}/${filename}`;
-      urlMap[absolute] = relative;
+      const filename = `${String(index).padStart(2, '0')}.${guessImageExtension(absolute)}`;
+
       try {
-        await downloadBinaryUrl(absolute, `${imageFolder}/${filename}`);
+        const downloadId = await downloadBinaryUrl(absolute, `${imageFolder}/${filename}`);
+        const result = await waitForDownload(downloadId);
+        if (!result.ok) {
+          failed += 1;
+        } else {
+          // используем имя, под которым файл реально лёг на диск
+          urlMap[absolute] = toMarkdownPath(`${imageDir}/${result.filename}`);
+          saved += 1;
+        }
         await HabrFetch.sleep(300);
       } catch {
-        // keep remote URL
-        delete urlMap[absolute];
+        failed += 1;
       }
+    }
+
+    // Пишем в журнал всегда: без этого невозможно понять, действительно ли
+    // картинки легли на диск, или в .md остались ссылки на habrastorage.
+    if (saved || failed) {
+      await HabrJournal.add({
+        action: 'images',
+        url: meta.url,
+        status: failed ? 'warn' : 'ok',
+        message: failed
+          ? `картинки: сохранено ${saved}, не удалось ${failed} — для них остались внешние ссылки`
+          : `картинки: сохранено ${saved} в ${imageDir}`,
+      });
     }
 
     return HabrMarkdown.replaceImageUrls(markdown, urlMap);
@@ -256,10 +401,48 @@ const HabrCore = (() => {
     }
 
     try {
-      const html = await HabrFetch.fetchHtml(normalized);
-      const article = HabrParser.extractPublicationFromHtml(html, normalized, {
-        includeComments: settings.downloadComments,
-      });
+      // Комментарии рендерятся на клиенте — в статичном HTML их нет, только kek-API
+      let apiComments = [];
+      if (settings.downloadComments && articleId) {
+        try {
+          apiComments = await HabrApi.fetchComments(articleId, {
+            limit: settings.commentsLimit || 500,
+          });
+        } catch (err) {
+          if (err?.name === 'RateLimitError') throw err;
+          await HabrJournal.add({
+            action: 'comments', url: normalized, status: 'warn', message: err.message,
+          });
+        }
+      }
+
+      // Основной путь — JSON-API: он не ломается при смене вёрстки.
+      // HTML-парсер остаётся фолбэком, если API недоступен или сменил формат.
+      let article = null;
+      if (settings.useApiParser !== false && articleId) {
+        try {
+          const data = await HabrApi.fetchArticle(articleId);
+          const parsed = HabrParser.extractPublicationFromApi(data, normalized, {
+            includeComments: settings.downloadComments,
+            apiComments,
+          });
+          if (parsed.success) article = parsed;
+        } catch (err) {
+          if (err?.name === 'RateLimitError') throw err;
+          await HabrJournal.add({
+            action: 'parse', url: normalized, status: 'warn',
+            message: `API недоступен, беру HTML: ${err.message}`,
+          });
+        }
+      }
+
+      if (!article) {
+        const html = await HabrFetch.fetchHtml(normalized);
+        article = HabrParser.extractPublicationFromHtml(html, normalized, {
+          includeComments: settings.downloadComments,
+          apiComments,
+        });
+      }
 
       if (!article.success) {
         await HabrJournal.add({ action: 'download', url: normalized, status: 'error', message: article.error });
@@ -267,6 +450,10 @@ const HabrCore = (() => {
       }
 
       if (!skipFilters && !HabrFilters.passesFilters(article.meta, normalized, settings, options.preview)) {
+        await HabrJournal.add({
+          action: 'download', url: normalized, status: 'skip',
+          message: `фильтр: ${article.meta.title || ''}`.trim(),
+        });
         return { success: true, url: normalized, articleId, publicationKey, skipped: true, reason: 'filter' };
       }
 
@@ -284,6 +471,7 @@ const HabrCore = (() => {
         status: 'ok',
         filename: relativePath.split('/').pop(),
         message: article.meta.title,
+        comments: article.commentsCount || 0,
       });
 
       return {
@@ -381,8 +569,10 @@ const HabrCore = (() => {
 
     const allItems = new Map();
     const maxPerCycle = settings.watchMaxDownloadsPerCycle || 5;
-    const maxChecks = settings.watchMaxItemsScan || 25;
-    const maxFetches = settings.watchMaxFetchesPerCycle || 8;
+    // проверка кандидата бесплатна (превью уже есть) — не режем ей глубину обхода
+    const maxChecks = Math.max(discoveryBudget(settings), maxPerCycle);
+    // сетевой бюджет: не меньше квоты на скачивание, иначе она недостижима
+    const maxFetches = Math.max(settings.watchMaxFetchesPerCycle || 8, maxPerCycle);
 
     try {
       for (const source of settings.watchSources) {
@@ -502,6 +692,7 @@ const HabrCore = (() => {
 
   return {
     DEFAULT_SETTINGS,
+    MAX_WATCH_PAGES,
     WATCH_ALARM,
     BATCH_STATE_KEY,
     WATCH_STATE_KEY,
@@ -509,6 +700,8 @@ const HabrCore = (() => {
     saveSettings,
     exportSettings,
     importSettings,
+    buildMarkdownDownloadUrl,
+    downloadImagesForMarkdown,
     downloadMarkdownToPath,
     downloadPublicationByUrl,
     downloadArticleByUrl: (...args) => downloadPublicationByUrl(...args),

@@ -1,18 +1,18 @@
 {
   "manifest_version": 3,
   "name": "Habr Article Downloader",
-  "version": "3.1.5",
+  "version": "3.4.1",
   "description": "Скачивает публикации Habr в Markdown: вручную, пакетом, слежением и фильтрами",
   "permissions": [
-    "activeTab",
     "downloads",
-    "scripting",
     "storage",
     "alarms",
     "contextMenus",
     "notifications"
   ],
-  "host_permissions": ["https://habr.com/*"],
+  "host_permissions": [
+    "https://habr.com/*"
+  ],
   "action": {
     "default_title": "Habr → Markdown",
     "default_popup": "popup.html",
@@ -32,7 +32,9 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://habr.com/*"],
+      "matches": [
+        "https://habr.com/*"
+      ],
       "js": [
         "lib/turndown.js",
         "lib/turndown-plugin-gfm.js",
@@ -40,7 +42,9 @@
         "parser.js",
         "content.js"
       ],
-      "css": ["styles/content.css"],
+      "css": [
+        "styles/content.css"
+      ],
       "run_at": "document_idle"
     }
   ]

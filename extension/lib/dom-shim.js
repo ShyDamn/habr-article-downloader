@@ -24,7 +24,6 @@ if (typeof globalThis.Buffer === 'undefined') {
     },
   };
 }
-
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -39,7 +38,11 @@ if (typeof globalThis.Buffer === 'undefined') {
     throw Error('Dynamic require of "' + x + '" is not supported');
   });
   var __commonJS = (cb, mod) => function __require2() {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+    try {
+      return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+    } catch (e) {
+      throw mod = 0, e;
+    }
   };
   var __export = (target, all) => {
     for (var name in all)
@@ -1591,28 +1594,28 @@ if (typeof globalThis.Buffer === 'undefined') {
   });
 
   // node_modules/linkedom/esm/shared/symbols.js
-  var CHANGED = Symbol("changed");
-  var CLASS_LIST = Symbol("classList");
-  var CUSTOM_ELEMENTS = Symbol("CustomElements");
-  var CONTENT = Symbol("content");
-  var DATASET = Symbol("dataset");
-  var DOCTYPE = Symbol("doctype");
-  var DOM_PARSER = Symbol("DOMParser");
-  var END = Symbol("end");
-  var EVENT_TARGET = Symbol("EventTarget");
-  var GLOBALS = Symbol("globals");
-  var IMAGE = Symbol("image");
-  var MIME = Symbol("mime");
-  var MUTATION_OBSERVER = Symbol("MutationObserver");
-  var NEXT = Symbol("next");
-  var OWNER_ELEMENT = Symbol("ownerElement");
-  var PREV = Symbol("prev");
-  var PRIVATE = Symbol("private");
-  var SHEET = Symbol("sheet");
-  var START = Symbol("start");
-  var STYLE = Symbol("style");
-  var UPGRADE = Symbol("upgrade");
-  var VALUE = Symbol("value");
+  var CHANGED = /* @__PURE__ */ Symbol("changed");
+  var CLASS_LIST = /* @__PURE__ */ Symbol("classList");
+  var CUSTOM_ELEMENTS = /* @__PURE__ */ Symbol("CustomElements");
+  var CONTENT = /* @__PURE__ */ Symbol("content");
+  var DATASET = /* @__PURE__ */ Symbol("dataset");
+  var DOCTYPE = /* @__PURE__ */ Symbol("doctype");
+  var DOM_PARSER = /* @__PURE__ */ Symbol("DOMParser");
+  var END = /* @__PURE__ */ Symbol("end");
+  var EVENT_TARGET = /* @__PURE__ */ Symbol("EventTarget");
+  var GLOBALS = /* @__PURE__ */ Symbol("globals");
+  var IMAGE = /* @__PURE__ */ Symbol("image");
+  var MIME = /* @__PURE__ */ Symbol("mime");
+  var MUTATION_OBSERVER = /* @__PURE__ */ Symbol("MutationObserver");
+  var NEXT = /* @__PURE__ */ Symbol("next");
+  var OWNER_ELEMENT = /* @__PURE__ */ Symbol("ownerElement");
+  var PREV = /* @__PURE__ */ Symbol("prev");
+  var PRIVATE = /* @__PURE__ */ Symbol("private");
+  var SHEET = /* @__PURE__ */ Symbol("sheet");
+  var START = /* @__PURE__ */ Symbol("start");
+  var STYLE = /* @__PURE__ */ Symbol("style");
+  var UPGRADE = /* @__PURE__ */ Symbol("upgrade");
+  var VALUE = /* @__PURE__ */ Symbol("value");
 
   // node_modules/htmlparser2/dist/esm/index.js
   var esm_exports3 = {};
@@ -6904,7 +6907,7 @@ if (typeof globalThis.Buffer === 'undefined') {
     return filter2(Checks2["tag_type"](type), nodes, recurse, limit);
   }
 
-  // node_modules/dom-serializer/node_modules/entities/dist/escape.js
+  // node_modules/entities/dist/escape.js
   var xmlCodeMap2 = /* @__PURE__ */ new Map([
     [34, "&quot;"],
     [38, "&amp;"],
@@ -6974,7 +6977,7 @@ if (typeof globalThis.Buffer === 'undefined') {
     [160, "&nbsp;"]
   ]));
 
-  // node_modules/dom-serializer/node_modules/entities/dist/index.js
+  // node_modules/entities/dist/index.js
   var EntityLevel2;
   (function(EntityLevel3) {
     EntityLevel3[EntityLevel3["XML"] = 0] = "XML";
@@ -12134,7 +12137,7 @@ if (typeof globalThis.Buffer === 'undefined') {
   }
   setPrototypeOf(Document4, Document2).prototype = Document2.prototype;
 
-  // extension/utils/dom-shim-entry.js
+  // utils/dom-shim-entry.js
   if (typeof globalThis.DOMParser === "undefined") {
     globalThis.DOMParser = DOMParser;
   }

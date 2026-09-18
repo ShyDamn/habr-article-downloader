@@ -1,16 +1,26 @@
-importScripts(
-  'lib/dom-shim.js',
-  'lib/turndown.js',
-  'lib/turndown-plugin-gfm.js',
-  'utils/fetch-retry.js',
-  'utils/rss.js',
-  'utils/journal.js',
-  'utils/filename.js',
-  'markdown.js',
-  'parser.js',
-  'filters.js',
-  'habr-core.js',
-);
+// Firefox: browser.* промисифицирован, chrome.* — коллбэчный. Подменяем, чтобы await работал везде.
+if (typeof browser !== 'undefined' && browser.runtime?.id) {
+  globalThis.chrome = browser;
+}
+
+// Chrome MV3: service worker грузит модули через importScripts.
+// Firefox MV3: event page, скрипты перечислены в manifest.background.scripts.
+if (typeof importScripts === 'function') {
+  importScripts(
+    'lib/dom-shim.js',
+    'lib/turndown.js',
+    'lib/turndown-plugin-gfm.js',
+    'utils/fetch-retry.js',
+    'utils/habr-api.js',
+    'utils/rss.js',
+    'utils/journal.js',
+    'utils/filename.js',
+    'markdown.js',
+    'parser.js',
+    'filters.js',
+    'habr-core.js',
+  );
+}
 
 let batchPromise = null;
 let watchPromise = null;

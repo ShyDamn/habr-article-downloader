@@ -1,3 +1,8 @@
+// Firefox: chrome.* здесь коллбэчный, browser.* — промисифицированный. Выравниваем.
+if (typeof browser !== 'undefined' && browser.runtime?.id) {
+  globalThis.chrome = browser;
+}
+
 (function initHabrDownloaderUi() {
   const PUBLICATION_PATH_RE = /\/(?:companies\/[^/]+\/)?(?:articles|news|post)\/\d+/;
 
@@ -178,10 +183,20 @@
     btn.dataset.url = url;
     btn.dataset.defaultTitle = 'Скачать в Markdown';
     btn.title = btn.dataset.defaultTitle;
-    btn.innerHTML = `
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v2H5v-2z"/></svg>
-      <span class="habr-md-label">.md</span>
-    `;
+    // Собираем иконку через DOM: линтеры магазинов флагуют любое присваивание innerHTML
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', 'M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v2H5v-2z');
+    svg.append(path);
+
+    const label = document.createElement('span');
+    label.className = 'habr-md-label';
+    label.textContent = '.md';
+
+    btn.append(svg, label);
     btn.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();

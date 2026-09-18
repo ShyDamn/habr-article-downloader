@@ -1,3 +1,8 @@
+// Firefox: chrome.* здесь коллбэчный, browser.* — промисифицированный. Выравниваем.
+if (typeof browser !== 'undefined' && browser.runtime?.id) {
+  globalThis.chrome = browser;
+}
+
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
@@ -47,6 +52,7 @@ function readAllSettings() {
     subfolderByHub: $('#subfolderByHub').checked,
     downloadComments: $('#downloadComments').checked,
     downloadImages: $('#downloadImages').checked,
+    useApiParser: $('#useApiParser').checked,
     useRssDiscovery: $('#useRssDiscovery').checked,
     batchDelayMs: Math.max(1500, parseInt($('#batchDelay').value, 10) || 3000),
     redownloadAfterDays: Math.max(0, parseInt($('#redownloadAfterDays').value, 10) || 0),
@@ -55,7 +61,7 @@ function readAllSettings() {
     enableContextMenu: $('#enableContextMenu').checked,
     watchEnabled: $('#watchEnabled').checked,
     watchIntervalMinutes: Math.max(5, parseInt($('#watchInterval').value, 10) || 15),
-    watchMaxPages: Math.min(3, Math.max(1, parseInt($('#watchMaxPages').value, 10) || 1)),
+    watchMaxPages: Math.min(5, Math.max(1, parseInt($('#watchMaxPages').value, 10) || 1)),
     watchMaxDownloadsPerCycle: Math.min(20, Math.max(1, parseInt($('#watchMaxDownloads').value, 10) || 5)),
     watchSources: $('#watchSources').value.split(/\r?\n/).map((l) => l.trim()).filter(Boolean),
   };
@@ -69,6 +75,7 @@ function applySettings(s) {
   $('#subfolderByHub').checked = Boolean(s.subfolderByHub);
   $('#downloadComments').checked = s.downloadComments !== false;
   $('#downloadImages').checked = Boolean(s.downloadImages);
+  $('#useApiParser').checked = s.useApiParser !== false;
   $('#useRssDiscovery').checked = Boolean(s.useRssDiscovery);
   $('#batchDelay').value = s.batchDelayMs ?? 3000;
   $('#redownloadAfterDays').value = s.redownloadAfterDays ?? 0;
@@ -125,26 +132,76 @@ async function pollState() {
   }
 }
 
+const JOURNAL_STATUS = {
+  ok: ['✓', 'ok'],
+  skip: ['–', 'skip'],
+  warn: ['!', 'warn'],
+  error: ['×', 'err'],
+};
+
+function renderJournal(entries) {
+  const box = $('#journalList');
+  if (!entries?.length) {
+    const empty = document.createElement('p');
+    empty.className = 'help';
+    empty.textContent = 'Пока пусто — журнал заполнится при первой загрузке.';
+    box.replaceChildren(empty);
+    return;
+  }
+  box.replaceChildren();
+  entries.forEach((e) => {
+    const [icon, cls] = JOURNAL_STATUS[e.status] || ['·', ''];
+    const row = document.createElement('div');
+    row.className = `journal__row journal__row--${cls}`;
+
+    const time = new Date(e.time).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const head = document.createElement('div');
+    head.className = 'journal__head';
+    head.textContent = `${icon} ${time}`;
+
+    const body = document.createElement('div');
+    body.className = 'journal__body';
+    body.textContent = e.message || e.filename || e.url || '';
+
+    const link = document.createElement('a');
+    link.className = 'journal__link';
+    link.href = e.url || '#';
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    link.textContent = e.url ? e.url.replace('https://habr.com', '') : '';
+
+    row.append(head, body);
+    if (e.url) row.append(link);
+    box.append(row);
+  });
+}
+
+async function loadJournal() {
+  const res = await chrome.runtime.sendMessage({ type: 'GET_JOURNAL', limit: 100 });
+  if (res?.success) renderJournal(res.journal);
+}
+
+$('#journalRefreshBtn').addEventListener('click', loadJournal);
+
+$('#journalClearBtn').addEventListener('click', async () => {
+  await chrome.runtime.sendMessage({ type: 'CLEAR_JOURNAL' });
+  renderJournal([]);
+});
+
 $$('.tab').forEach((tab) => {
   tab.addEventListener('click', () => {
     $$('.tab').forEach((t) => t.classList.remove('active'));
     $$('.panel').forEach((p) => p.classList.remove('active'));
     tab.classList.add('active');
     $(`#panel-${tab.dataset.tab}`).classList.add('active');
+    if (tab.dataset.tab === 'journal') loadJournal();
   });
 });
 
-$$('.chip').forEach((chip) => {
-  chip.addEventListener('click', (e) => {
-    if (e.target.tagName === 'INPUT') return;
-    const input = chip.querySelector('input');
-    input.checked = !input.checked;
-    syncChips();
-  });
-});
-
-$$('input[name="filterTypes"]').forEach((el) => {
-  el.addEventListener('change', syncChips);
+// <label class="chip"> сам переключает вложенный input — своя обработка клика
+// отменяла это обратно, и чипы визуально не нажимались. Слушаем только change.
+$$('.chip input').forEach((input) => {
+  input.addEventListener('change', syncChips);
 });
 
 $('#batchFile').addEventListener('change', async (event) => {
@@ -236,7 +293,24 @@ $('#importSettingsFile').addEventListener('change', async (event) => {
   event.target.value = '';
 });
 
+// Firefox MV3 выдаёт host-permissions по запросу, а не при установке
+async function checkHostPermission() {
+  try {
+    const origins = ['https://habr.com/*'];
+    const granted = await chrome.permissions.contains({ origins });
+    $('#permBanner').hidden = granted;
+    if (granted) return;
+    $('#permBtn').onclick = async () => {
+      const ok = await chrome.permissions.request({ origins });
+      $('#permBanner').hidden = ok;
+    };
+  } catch {
+    $('#permBanner').hidden = true;
+  }
+}
+
 (async function init() {
+  await checkHostPermission();
   const res = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
   if (res?.success) applySettings(res.settings);
   syncChips();

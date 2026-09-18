@@ -234,7 +234,26 @@ const HabrParser = (() => {
     return comments;
   }
 
+  // Комментарии из kek-API: html + уровень вложенности
+  function formatApiCommentsMarkdown(comments) {
+    if (!comments?.length) return '';
+    let md = '\n\n---\n\n## Комментарии\n\n';
+    comments.forEach((c) => {
+      const indent = '> '.repeat(Math.min(c.level || 0, 6));
+      const score = c.score != null ? ` · ${c.score > 0 ? '+' : ''}${c.score}` : '';
+      const badge = c.isArticleAuthor ? ' · автор' : '';
+      const time = c.time ? ` · ${String(c.time).slice(0, 16).replace('T', ' ')}` : '';
+      const body = HabrMarkdown.fragmentToMarkdown(c.html)
+        .split('\n')
+        .map((line) => `${indent}${line}`.trimEnd())
+        .join('\n');
+      md += `${indent}**${c.author}**${score}${badge}${time}\n${indent}\n${body}\n\n`;
+    });
+    return md;
+  }
+
   function formatCommentsMarkdown(comments) {
+
     if (!comments.length) return '';
     let md = '\n\n---\n\n## Комментарии\n\n';
     comments.forEach((comment, index) => {
@@ -362,11 +381,19 @@ const HabrParser = (() => {
     let bodyMd = HabrMarkdown.htmlToMarkdown(bodyEl, baseUrl);
     meta.wordCount = HabrMarkdown.countWords(bodyMd);
 
-    const comments = options.includeComments
-      ? extractComments(doc, options.commentsLimit || 25)
-      : [];
-    if (comments.length) {
-      bodyMd += formatCommentsMarkdown(comments);
+    // Комментарии приоритетно берём из API (в статичном HTML их нет — Habr рисует их на клиенте)
+    let commentsCount = 0;
+    if (options.includeComments) {
+      if (options.apiComments?.length) {
+        bodyMd += formatApiCommentsMarkdown(options.apiComments);
+        commentsCount = options.apiComments.length;
+      } else {
+        const domComments = extractComments(doc, options.commentsLimit || 25);
+        if (domComments.length) {
+          bodyMd += formatCommentsMarkdown(domComments);
+          commentsCount = domComments.length;
+        }
+      }
     }
 
     const markdown = `${buildFrontmatter(meta)}\n\n${bodyMd}\n`;
@@ -380,7 +407,89 @@ const HabrParser = (() => {
       publicationKey: getPublicationKey(pageUrl),
       publicationType,
       meta,
-      commentsCount: comments.length,
+      commentsCount,
+    };
+  }
+
+  // ——— Разбор публикации из kek-API (структура сверена с реальным ответом) ———
+
+  function stripHtml(html) {
+    return String(html || '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .trim();
+  }
+
+  const API_COMPLEXITY = { low: 'easy', easy: 'easy', medium: 'medium', high: 'hard', hard: 'hard' };
+
+  function metaFromApi(data, pageUrl) {
+    const stats = data.statistics || {};
+    const hubs = (data.hubs || []).map((h) => h.title || stripHtml(h.titleHtml)).filter(Boolean);
+    const corporateHub = (data.hubs || []).find((h) => h.type && h.type !== 'collective') || null;
+    const complexityLevel = API_COMPLEXITY[String(data.complexity || '').toLowerCase()] || null;
+
+    return {
+      url: pageUrl,
+      articleId: String(data.id),
+      publicationType: getPublicationType(pageUrl),
+      title: stripHtml(data.titleHtml),
+      author: data.author?.alias || data.author?.fullname || '',
+      published: data.timePublished || null,
+      complexity: data.complexity || null,
+      complexityLevel,
+      readingTime: data.readingTime != null ? `${data.readingTime} мин` : null,
+      readingMinutes: Number.isFinite(data.readingTime) ? data.readingTime : null,
+      format: data.format || null,
+      reach: Number.isFinite(stats.reach) ? stats.reach : null,
+      hubs,
+      tags: (data.tags || []).map((t) => stripHtml(t.titleHtml)).filter(Boolean),
+      labels: (data.postLabels || []).map((l) => l.title || l.type).filter(Boolean),
+      rating: Number.isFinite(stats.score) ? stats.score : null,
+      votes: { up: stats.votesCountPlus ?? null, down: stats.votesCountMinus ?? null },
+      bookmarks: stats.favoritesCount ?? null,
+      comments: stats.commentsCount ?? null,
+      corporateBlog: corporateHub?.title || null,
+      isCorporate: Boolean(data.isCorporative || corporateHub),
+    };
+  }
+
+  function extractPublicationFromApi(data, pageUrl, options = {}) {
+    if (!getPublicationType(pageUrl)) {
+      return { success: false, error: 'Это не страница публикации Habr (/articles/, /news/, /post/)' };
+    }
+    if (!data?.id || !data.textHtml) {
+      return { success: false, error: 'API не вернул тело публикации' };
+    }
+
+    const meta = metaFromApi(data, pageUrl);
+    if (!meta.title) return { success: false, error: 'API не вернул заголовок публикации' };
+
+    let bodyMd = HabrMarkdown.fragmentToMarkdown(data.textHtml);
+    meta.wordCount = HabrMarkdown.countWords(bodyMd);
+
+    let commentsCount = 0;
+    if (options.includeComments && options.apiComments?.length) {
+      bodyMd += formatApiCommentsMarkdown(options.apiComments);
+      commentsCount = options.apiComments.length;
+    }
+
+    const markdown = `${buildFrontmatter(meta)}\n\n${bodyMd}\n`;
+
+    return {
+      success: true,
+      markdown,
+      filename: safeFilename(meta.title, meta.articleId),
+      articleId: meta.articleId,
+      publicationKey: getPublicationKey(pageUrl),
+      publicationType: meta.publicationType,
+      meta,
+      commentsCount,
+      source: 'api',
     };
   }
 
@@ -465,6 +574,8 @@ const HabrParser = (() => {
     extractPublicationFromDocument,
     extractArticleFromDocument,
     extractPublicationFromHtml,
+    extractPublicationFromApi,
+    metaFromApi,
     extractArticleFromHtml,
     extractPublicationsFromListHtml,
     extractArticleUrlsFromListHtml,
